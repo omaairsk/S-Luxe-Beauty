@@ -145,59 +145,12 @@
                 <a href="#" onclick="showSection('about')" class="hover:text-pink-500 transition font-medium">About</a>
             </div>
             <div class="flex items-center gap-4">
-                <div id="user-display" class="hidden text-sm font-semibold text-pink-600">
-                    Welcome, <span id="username-span">User</span>
-                </div>
-                <button id="auth-btn" onclick="showSection('auth')" class="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition shadow-lg text-sm font-bold">
-                    Login / Sign Up
+                <button onclick="showSection('analysis')" class="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition shadow-lg text-sm font-bold">
+                    Start Analysis
                 </button>
             </div>
         </div>
     </nav>
-
-    <!-- AUTH SECTION -->
-    <section id="auth-section" class="hidden-section min-h-screen flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1596462502278-27bfdd403348?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-        <div class="glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md relative z-10 mx-4">
-            <h2 class="text-3xl font-bold text-center mb-6 brand-font" id="auth-title">Welcome Back</h2>
-            
-            <!-- Login Form -->
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Email</label>
-                    <input type="email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" placeholder="you@example.com" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Password</label>
-                    <input type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
-                </div>
-                <button type="submit" class="w-full bg-pink-500 text-white py-3 rounded-lg font-bold hover:bg-pink-600 transition">Sign In</button>
-                <p class="text-center text-sm">Don't have an account? <a href="#" onclick="toggleAuthMode()" class="text-pink-600 font-bold">Sign Up</a></p>
-            </form>
-
-            <!-- Signup Form (Hidden initially) -->
-            <form id="signup-form" class="space-y-4 hidden">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Full Name</label>
-                    <input type="text" id="signup-name" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Email</label>
-                    <input type="email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Password</label>
-                    <input type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
-                </div>
-                <button type="submit" class="w-full bg-black text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition">Create Account</button>
-                <p class="text-center text-sm">Already have an account? <a href="#" onclick="toggleAuthMode()" class="text-pink-600 font-bold">Log In</a></p>
-                
-                <div class="mt-4 p-3 bg-green-50 text-green-700 text-xs rounded border border-green-200">
-                    <i class="fas fa-lock mr-1"></i> Privacy Promise: Your data is stored locally in your browser session only. We do not share it.
-                </div>
-            </form>
-        </div>
-    </section>
 
     <!-- HOME SECTION -->
     <section id="home-section" class="pt-10">
@@ -431,45 +384,14 @@
             if(sectionId === 'home') {
                 document.getElementById('home-section').classList.remove('hidden-section');
             } else {
-                document.getElementById(sectionId + '-section').classList.remove('hidden-section');
+                const target = document.getElementById(sectionId + '-section');
+                if(target) target.classList.remove('hidden-section');
             }
 
             if(sectionId === 'shop') {
                 renderShop(products);
             }
             window.scrollTo(0,0);
-        }
-
-        // --- AUTH LOGIC ---
-        function toggleAuthMode() {
-            document.getElementById('login-form').classList.toggle('hidden');
-            document.getElementById('signup-form').classList.toggle('hidden');
-            const title = document.getElementById('auth-title');
-            title.innerText = title.innerText === "Welcome Back" ? "Create Account" : "Welcome Back";
-        }
-
-        document.getElementById('login-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            handleLogin("S-Luxe Member");
-        });
-
-        document.getElementById('signup-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('signup-name').value;
-            handleLogin(name);
-        });
-
-        function handleLogin(name) {
-            localStorage.setItem('sluxe_user', name);
-            updateUserDisplay(name);
-            showSection('home');
-        }
-
-        function updateUserDisplay(name) {
-            document.getElementById('auth-btn').classList.add('hidden');
-            document.getElementById('user-display').classList.remove('hidden');
-            document.getElementById('user-display').classList.add('flex');
-            document.getElementById('username-span').innerText = name;
         }
 
         // --- SHOP RENDERER ---
@@ -644,10 +566,6 @@
             
             setTimeout(() => toast.remove(), 2000);
         }
-
-        // Initialize user if logged in previously
-        const savedUser = localStorage.getItem('sluxe_user');
-        if(savedUser) updateUserDisplay(savedUser);
 
     </script>
 </body>
