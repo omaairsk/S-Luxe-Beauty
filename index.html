@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Luxe Beauty | Virtual Try-On & Skin Analysis</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Custom Animations and Styles */
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
+
+        body {
+            font-family: 'Lato', sans-serif;
+            background-color: #fdf8f6; /* Soft cream background */
+        }
+        
+        h1, h2, h3, .brand-font {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Camera & Overlay Styles */
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            background: #000;
+        }
+
+        #video-feed {
+            width: 100%;
+            height: auto;
+            transform: scaleX(-1); /* Mirror effect */
+            display: block;
+        }
+
+        /* The makeup overlay layer */
+        #makeup-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            mix-blend-mode: multiply; /* Realistic color blending */
+            opacity: 0; 
+            transition: opacity 0.3s ease;
+            background: radial-gradient(ellipse at center, var(--lip-color, transparent) 0%, transparent 40%);
+        }
+
+        /* Face Guide Silhouette */
+        .face-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            height: 300px;
+            border: 2px dashed rgba(255, 255, 255, 0.6);
+            border-radius: 50% 50% 60% 60%;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3); /* Dim outside the face */
+        }
+        
+        .lips-guide {
+            position: absolute;
+            top: 65%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 40px;
+            border: 1px dotted rgba(255, 182, 193, 0.8);
+            border-radius: 50%;
+        }
+
+        /* Product Card Hover */
+        .product-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d4a5a5; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #b98484; 
+        }
+
+        .hidden-section {
+            display: none;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #d4a5a5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- NAVIGATION -->
+    <nav class="sticky top-0 z-50 glass-panel shadow-sm">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="showSection('home')">
+                <i class="fa-solid fa-gem text-pink-400 text-2xl"></i>
+                <span class="text-2xl font-bold brand-font text-gray-900 tracking-wide">S-Luxe Beauty</span>
+            </div>
+            <div class="hidden md:flex space-x-8">
+                <a href="#" onclick="showSection('home')" class="hover:text-pink-500 transition font-medium">Home</a>
+                <a href="#" onclick="showSection('shop')" class="hover:text-pink-500 transition font-medium">Shop</a>
+                <a href="#" onclick="showSection('analysis')" class="hover:text-pink-500 transition font-medium">AI Skin Analysis</a>
+                <a href="#" onclick="showSection('about')" class="hover:text-pink-500 transition font-medium">About</a>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="user-display" class="hidden text-sm font-semibold text-pink-600">
+                    Welcome, <span id="username-span">User</span>
+                </div>
+                <button id="auth-btn" onclick="showSection('auth')" class="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition shadow-lg text-sm font-bold">
+                    Login / Sign Up
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- AUTH SECTION -->
+    <section id="auth-section" class="hidden-section min-h-screen flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1596462502278-27bfdd403348?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+        <div class="glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md relative z-10 mx-4">
+            <h2 class="text-3xl font-bold text-center mb-6 brand-font" id="auth-title">Welcome Back</h2>
+            
+            <!-- Login Form -->
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Email</label>
+                    <input type="email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" placeholder="you@example.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Password</label>
+                    <input type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
+                </div>
+                <button type="submit" class="w-full bg-pink-500 text-white py-3 rounded-lg font-bold hover:bg-pink-600 transition">Sign In</button>
+                <p class="text-center text-sm">Don't have an account? <a href="#" onclick="toggleAuthMode()" class="text-pink-600 font-bold">Sign Up</a></p>
+            </form>
+
+            <!-- Signup Form (Hidden initially) -->
+            <form id="signup-form" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Full Name</label>
+                    <input type="text" id="signup-name" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Email</label>
+                    <input type="email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Password</label>
+                    <input type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-300 outline-none" required>
+                </div>
+                <button type="submit" class="w-full bg-black text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition">Create Account</button>
+                <p class="text-center text-sm">Already have an account? <a href="#" onclick="toggleAuthMode()" class="text-pink-600 font-bold">Log In</a></p>
+                
+                <div class="mt-4 p-3 bg-green-50 text-green-700 text-xs rounded border border-green-200">
+                    <i class="fas fa-lock mr-1"></i> Privacy Promise: Your data is stored locally in your browser session only. We do not share it.
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- HOME SECTION -->
+    <section id="home-section" class="pt-10">
+        <!-- Hero -->
+        <div class="container mx-auto px-6 flex flex-col-reverse md:flex-row items-center gap-12 min-h-[80vh]">
+            <div class="md:w-1/2 space-y-6">
+                <div class="inline-block bg-pink-100 text-pink-600 px-4 py-1 rounded-full text-sm font-bold uppercase tracking-wider">Virtual Try-On Technology</div>
+                <h1 class="text-5xl md:text-7xl font-bold leading-tight text-gray-900 brand-font">
+                    Discover Your <span class="text-pink-500 italic">Perfect</span> Look
+                </h1>
+                <p class="text-lg text-gray-600 leading-relaxed">
+                    Stop guessing. Use our AI-powered camera technology to analyze your skin tone and try on luxury and affordable dupes instantly. Real-time beauty, reimagined.
+                </p>
+                <div class="flex gap-4 pt-4">
+                    <button onclick="showSection('analysis')" class="bg-black text-white px-8 py-4 rounded-full font-bold shadow-lg hover:shadow-xl hover:bg-gray-800 transition transform hover:-translate-y-1">
+                        <i class="fas fa-camera mr-2"></i> Analyze My Skin
+                    </button>
+                    <button onclick="showSection('shop')" class="border-2 border-black px-8 py-4 rounded-full font-bold hover:bg-black hover:text-white transition">
+                        Shop Products
+                    </button>
+                </div>
+            </div>
+            <div class="md:w-1/2 relative">
+                <div class="absolute -inset-4 bg-pink-200 rounded-full blur-3xl opacity-30 animate-pulse"></div>
+                <img src="https://images.unsplash.com/photo-1522335208411-2f33056524dd?q=80&w=2079&auto=format&fit=crop" alt="Beauty Model" class="relative rounded-[3rem] shadow-2xl w-full object-cover h-[600px]">
+            </div>
+        </div>
+
+        <!-- Features Strip -->
+        <div class="bg-white py-16 mt-20">
+            <div class="container mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                <div class="p-6">
+                    <div class="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4 text-pink-500 text-2xl">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">AI Skin Analysis</h3>
+                    <p class="text-gray-500">Instant detection of your skin tone and undertone using just your camera.</p>
+                </div>
+                <div class="p-6">
+                    <div class="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4 text-pink-500 text-2xl">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">High-End & Dupes</h3>
+                    <p class="text-gray-500">Find the perfect match for your budget, from luxury brands to affordable alternatives.</p>
+                </div>
+                <div class="p-6">
+                    <div class="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4 text-pink-500 text-2xl">
+                        <i class="fas fa-video"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Live Virtual Try-On</h3>
+                    <p class="text-gray-500">See exactly how lipsticks and foundations look on your face in real-time.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI ANALYSIS & TRY ON SECTION -->
+    <section id="analysis-section" class="hidden-section py-12 bg-gray-50 min-h-screen">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-10">
+                <h2 class="text-4xl font-bold brand-font mb-4">AI Skin Studio</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">Enable your camera. We will scan your skin pixels to determine your tone and let you virtually try on products.</p>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8 items-start">
+                
+                <!-- Left: Camera Feed -->
+                <div class="w-full lg:w-1/2 sticky top-24">
+                    <div class="camera-container bg-gray-900 aspect-[3/4] relative group">
+                        <!-- Video Element -->
+                        <video id="video-feed" autoplay playsinline muted></video>
+                        <canvas id="analysis-canvas" class="hidden"></canvas>
+                        
+                        <!-- Makeup Overlay -->
+                        <div id="makeup-overlay"></div>
+
+                        <!-- Face Guide -->
+                        <div id="face-guide" class="face-guide hidden"></div>
+                        <div id="lips-guide" class="lips-guide hidden"></div>
+
+                        <!-- Controls Overlay -->
+                        <div class="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-4">
+                            <div id="analysis-result" class="hidden bg-white/10 backdrop-blur-md text-white px-6 py-3 rounded-lg border border-white/20 text-center">
+                                <p class="text-xs uppercase tracking-widest text-pink-300 mb-1">Detected Skin Tone</p>
+                                <h3 id="skin-tone-text" class="text-xl font-bold">Scanning...</h3>
+                            </div>
+                            
+                            <div class="flex gap-4">
+                                <button id="start-cam-btn" onclick="startCamera()" class="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2 rounded-full font-bold transition flex items-center">
+                                    <i class="fas fa-power-off mr-2"></i> Start Camera
+                                </button>
+                                <button id="analyze-btn" onclick="analyzeSkin()" class="hidden bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition">
+                                    <i class="fas fa-fingerprint mr-2"></i> Scan My Skin
+                                </button>
+                            </div>
+                            <p class="text-gray-400 text-xs mt-2"><i class="fas fa-shield-alt"></i> Images are processed locally and never saved.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Product Recommender -->
+                <div class="w-full lg:w-1/2">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-2xl font-bold brand-font">Recommended For You</h3>
+                            <div class="flex bg-gray-100 rounded-lg p-1">
+                                <button onclick="filterPrice('all')" class="px-4 py-1 rounded-md text-sm font-medium bg-white shadow-sm transition">All</button>
+                                <button onclick="filterPrice('cheap')" class="px-4 py-1 rounded-md text-sm font-medium text-gray-500 hover:bg-white transition">Budget</button>
+                                <button onclick="filterPrice('expensive')" class="px-4 py-1 rounded-md text-sm font-medium text-gray-500 hover:bg-white transition">Luxury</button>
+                            </div>
+                        </div>
+                        
+                        <div id="recommendation-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 h-[600px] overflow-y-auto pr-2">
+                            <!-- Products will be injected here via JS -->
+                            <div class="col-span-full flex flex-col items-center justify-center h-64 text-gray-400">
+                                <i class="fas fa-camera text-4xl mb-3"></i>
+                                <p>Scan your skin to see personalized matches.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SHOP SECTION -->
+    <section id="shop-section" class="hidden-section py-12">
+        <div class="container mx-auto px-6">
+            <h2 class="text-4xl font-bold brand-font text-center mb-12">All Beauty Products</h2>
+            <div id="shop-grid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- ABOUT SECTION -->
+    <section id="about-section" class="hidden-section py-20 bg-white">
+        <div class="container mx-auto px-6 max-w-4xl text-center">
+            <h2 class="text-4xl font-bold brand-font mb-8">About S-Luxe Beauty</h2>
+            <p class="text-xl text-gray-600 leading-relaxed mb-10">
+                S-Luxe Beauty was born from a simple idea: Luxury shouldn't be a guessing game. We believe that every woman deserves to find the perfect shade for her unique skin tone, whether she's spending $10 or $100.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                <div class="bg-pink-50 p-8 rounded-2xl">
+                    <h4 class="font-bold text-lg mb-2">Our Mission</h4>
+                    <p class="text-gray-600">To democratize beauty technology. We provide high-end analysis tools completely free, helping you make informed decisions before you buy.</p>
+                </div>
+                <div class="bg-gray-50 p-8 rounded-2xl">
+                    <h4 class="font-bold text-lg mb-2">Privacy First</h4>
+                    <p class="text-gray-600">Your face is your identity. We designed our system to process everything in your browser's RAM. We never see, store, or sell your biometric data.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-gray-900 text-white pt-16 pb-8">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <i class="fa-solid fa-gem text-pink-400 text-xl"></i>
+                        <span class="text-xl font-bold brand-font">S-Luxe Beauty</span>
+                    </div>
+                    <p class="text-gray-400 text-sm">Empowering beauty through technology. Find your perfect match today.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4 text-pink-400">Company</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="#" onclick="showSection('about')" class="hover:text-white">About Us</a></li>
+                        <li><a href="#" class="hover:text-white">Careers</a></li>
+                        <li><a href="#" class="hover:text-white">Press</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4 text-pink-400">Legal</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="#" class="hover:text-white">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-white">Terms & Conditions</a></li>
+                        <li><a href="#" class="hover:text-white">Cookie Policy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4 text-pink-400">Connect</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-pink-600 transition"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-pink-600 transition"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-pink-600 transition"><i class="fab fa-tiktok"></i></a>
+                    </div>
+                    <div class="mt-4 text-sm text-gray-400">
+                        <i class="far fa-envelope mr-2"></i> support@s-luxebeauty.com
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
+                <p>&copy; 2024 S-Luxe Beauty Inc. All rights reserved. <br>Disclaimer: This is a demo application.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- DATA MOCK ---
+        const products = [
+            // LIPSTICKS
+            { id: 1, name: "Ruby Woo Matte", brand: "MAC", price: 25, type: "Lipstick", tone: "Cool", skin: "All", color: "rgba(208, 1, 27, 0.6)", img: "https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 2, name: "Red Revival (Dupe)", brand: "Maybelline", price: 8, type: "Lipstick", tone: "Cool", skin: "All", color: "rgba(180, 0, 20, 0.6)", img: "https://images.unsplash.com/photo-1625093742435-6fa192b6fb10?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 3, name: "Pillow Talk", brand: "Charlotte Tilbury", price: 35, type: "Lipstick", tone: "Warm", skin: "Fair", color: "rgba(186, 114, 114, 0.6)", img: "https://images.unsplash.com/photo-1605705653706-5f3af9a42168?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 4, name: "Spiced Petal (Dupe)", brand: "Flower Beauty", price: 11, type: "Lipstick", tone: "Warm", skin: "Fair", color: "rgba(190, 120, 120, 0.6)", img: "https://images.unsplash.com/photo-1599305090598-fe179d501227?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 5, name: "Black Honey", brand: "Clinique", price: 24, type: "Lipstick", tone: "Deep", skin: "Dark", color: "rgba(80, 10, 20, 0.7)", img: "https://images.unsplash.com/photo-1627293774780-87779f53e602?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 6, name: "Tafetta (Dupe)", brand: "Elf", price: 7, type: "Lipstick", tone: "Deep", skin: "Dark", color: "rgba(85, 15, 25, 0.7)", img: "https://images.unsplash.com/photo-1591360236480-943048997a0b?auto=format&fit=crop&q=80&w=300", link: "#" },
+
+            // FOUNDATIONS
+            { id: 7, name: "Luminous Silk", brand: "Armani", price: 69, type: "Foundation", tone: "Neutral", skin: "Medium", color: "rgba(227, 188, 154, 0.3)", img: "https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 8, name: "True Match (Dupe)", brand: "L'Oreal", price: 13, type: "Foundation", tone: "Neutral", skin: "Medium", color: "rgba(225, 185, 150, 0.3)", img: "https://images.unsplash.com/photo-1590156424570-698d124ec7dd?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 9, name: "Double Wear", brand: "Estee Lauder", price: 52, type: "Foundation", tone: "Warm", skin: "Oily", color: "rgba(200, 140, 100, 0.3)", img: "https://images.unsplash.com/photo-1631214500115-598fc2cb8d2d?auto=format&fit=crop&q=80&w=300", link: "#" },
+            
+            // BLUSH
+            { id: 10, name: "Orgasm", brand: "NARS", price: 32, type: "Blush", tone: "Peachy", skin: "All", color: "rgba(255, 160, 140, 0.4)", img: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?auto=format&fit=crop&q=80&w=300", link: "#" },
+            { id: 11, name: "Coral (Dupe)", brand: "Milani", price: 9, type: "Blush", tone: "Peachy", skin: "All", color: "rgba(250, 155, 135, 0.4)", img: "https://images.unsplash.com/photo-1596704017254-9b121068fb31?auto=format&fit=crop&q=80&w=300", link: "#" }
+        ];
+
+        let detectedSkinTone = "Unknown"; // Fair, Medium, Dark
+        let stream = null;
+
+        // --- NAVIGATION ---
+        function showSection(sectionId) {
+            document.querySelectorAll('section').forEach(sec => sec.classList.add('hidden-section'));
+            document.getElementById('home-section').classList.add('hidden-section'); // explicit hide for home
+            
+            if(sectionId === 'home') {
+                document.getElementById('home-section').classList.remove('hidden-section');
+            } else {
+                document.getElementById(sectionId + '-section').classList.remove('hidden-section');
+            }
+
+            if(sectionId === 'shop') {
+                renderShop(products);
+            }
+            window.scrollTo(0,0);
+        }
+
+        // --- AUTH LOGIC ---
+        function toggleAuthMode() {
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('signup-form').classList.toggle('hidden');
+            const title = document.getElementById('auth-title');
+            title.innerText = title.innerText === "Welcome Back" ? "Create Account" : "Welcome Back";
+        }
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleLogin("S-Luxe Member");
+        });
+
+        document.getElementById('signup-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('signup-name').value;
+            handleLogin(name);
+        });
+
+        function handleLogin(name) {
+            localStorage.setItem('sluxe_user', name);
+            updateUserDisplay(name);
+            showSection('home');
+        }
+
+        function updateUserDisplay(name) {
+            document.getElementById('auth-btn').classList.add('hidden');
+            document.getElementById('user-display').classList.remove('hidden');
+            document.getElementById('user-display').classList.add('flex');
+            document.getElementById('username-span').innerText = name;
+        }
+
+        // --- SHOP RENDERER ---
+        function renderShop(items) {
+            const grid = document.getElementById('shop-grid');
+            grid.innerHTML = items.map(product => `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden product-card flex flex-col">
+                    <div class="relative h-48 bg-gray-100">
+                        <img src="${product.img}" class="w-full h-full object-cover">
+                        <div class="absolute top-2 right-2 bg-white px-2 py-1 text-xs font-bold rounded-full shadow">
+                            ${product.skin === "All" ? "All Skin Types" : product.skin + " Skin"}
+                        </div>
+                    </div>
+                    <div class="p-4 flex-grow flex flex-col">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="text-xs text-gray-500 uppercase font-semibold tracking-wide">${product.brand}</p>
+                                <h3 class="font-bold text-gray-900">${product.name}</h3>
+                            </div>
+                            <span class="text-lg font-bold text-pink-600">$${product.price}</span>
+                        </div>
+                        <div class="mt-auto pt-4 flex gap-2">
+                             <a href="${product.link}" target="_blank" class="flex-1 bg-black text-white text-center py-2 rounded text-sm font-bold hover:bg-gray-800">Buy Now</a>
+                             <button onclick="alert('Go to AI Analysis to try this on!')" class="px-3 py-2 border border-gray-300 rounded hover:bg-pink-50 text-pink-600 transition">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- CAMERA & AI ANALYSIS ---
+        async function startCamera() {
+            const video = document.getElementById('video-feed');
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                document.getElementById('start-cam-btn').classList.add('hidden');
+                document.getElementById('analyze-btn').classList.remove('hidden');
+                document.getElementById('analyze-btn').classList.add('flex');
+                
+                // Show Guides
+                document.getElementById('face-guide').classList.remove('hidden');
+                document.getElementById('lips-guide').classList.remove('hidden');
+                
+            } catch (err) {
+                alert("Camera access denied or not available. Please allow camera access to use the Virtual Try-On.");
+                console.error(err);
+            }
+        }
+
+        function analyzeSkin() {
+            const video = document.getElementById('video-feed');
+            const canvas = document.getElementById('analysis-canvas');
+            const ctx = canvas.getContext('2d');
+            const toneText = document.getElementById('skin-tone-text');
+
+            if (!stream) {
+                alert("Please start the camera first!");
+                return;
+            }
+
+            // Capture frame
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Get center pixels (50x50 area) to avoid hair/background
+            const centerX = Math.floor(canvas.width / 2);
+            const centerY = Math.floor(canvas.height / 2);
+            const frameData = ctx.getImageData(centerX - 25, centerY - 25, 50, 50);
+            const data = frameData.data;
+
+            let r = 0, g = 0, b = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i];
+                g += data[i+1];
+                b += data[i+2];
+            }
+            
+            // Average RGB
+            r = Math.floor(r / (data.length / 4));
+            g = Math.floor(g / (data.length / 4));
+            b = Math.floor(b / (data.length / 4));
+
+            // Simple Brightness Formula
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+            // Classification Logic (Heuristic)
+            if (brightness > 170) {
+                detectedSkinTone = "Fair";
+            } else if (brightness > 100) {
+                detectedSkinTone = "Medium";
+            } else {
+                detectedSkinTone = "Dark";
+            }
+
+            // Update UI
+            document.getElementById('analysis-result').classList.remove('hidden');
+            toneText.innerText = detectedSkinTone;
+            toneText.className = "text-xl font-bold animate-pulse text-" + (detectedSkinTone === 'Fair' ? 'yellow-100' : detectedSkinTone === 'Medium' ? 'yellow-400' : 'yellow-800');
+
+            // Filter products based on result
+            loadRecommendations(detectedSkinTone);
+        }
+
+        function loadRecommendations(skinTone) {
+            const container = document.getElementById('recommendation-container');
+            
+            // Logic: Filter suitable products. 
+            // Fair skin gets Cool/Warm light colors. Medium gets Neutral/Warm. Dark gets Deep colors.
+            let relevantProducts = products.filter(p => {
+                if (skinTone === "Fair") return p.tone === "Cool" || p.tone === "Peachy" || p.tone === "Warm";
+                if (skinTone === "Medium") return p.tone === "Neutral" || p.tone === "Warm" || p.tone === "Peachy";
+                if (skinTone === "Dark") return p.tone === "Deep" || p.tone === "Warm";
+                return true;
+            });
+
+            window.currentRecs = relevantProducts; // Store for price filtering
+            renderRecs(relevantProducts);
+        }
+
+        function filterPrice(type) {
+            if(!window.currentRecs) return;
+            let filtered = window.currentRecs;
+            if (type === 'cheap') filtered = window.currentRecs.filter(p => p.price < 20);
+            if (type === 'expensive') filtered = window.currentRecs.filter(p => p.price >= 20);
+            renderRecs(filtered);
+        }
+
+        function renderRecs(items) {
+            const container = document.getElementById('recommendation-container');
+            if(items.length === 0) {
+                container.innerHTML = `<div class="p-4 text-center text-gray-500 col-span-full">No products found for this filter.</div>`;
+                return;
+            }
+
+            container.innerHTML = items.map(p => `
+                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-white border border-transparent hover:border-pink-200 transition cursor-pointer" onclick="tryOnProduct('${p.color}', '${p.name}')">
+                    <img src="${p.img}" class="w-12 h-12 rounded-full object-cover border border-gray-200">
+                    <div class="flex-grow">
+                        <h4 class="font-bold text-sm text-gray-900">${p.name}</h4>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-500">${p.brand}</span>
+                            <span class="text-xs font-bold text-pink-600">$${p.price}</span>
+                        </div>
+                    </div>
+                    <button class="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-xs">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // --- VIRTUAL TRY ON LOGIC ---
+        function tryOnProduct(colorStr, productName) {
+            const overlay = document.getElementById('makeup-overlay');
+            const lipsGuide = document.getElementById('lips-guide');
+            
+            // Update CSS variable for the gradient
+            overlay.style.setProperty('--lip-color', colorStr);
+            
+            // Visual feedback
+            overlay.style.opacity = '0.6';
+            
+            // Toast notification
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-black text-white px-6 py-2 rounded-full text-sm font-bold shadow-xl z-50 animate-bounce';
+            toast.innerHTML = `<i class="fas fa-check-circle text-green-400 mr-2"></i> Trying on ${productName}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 2000);
+        }
+
+        // Initialize user if logged in previously
+        const savedUser = localStorage.getItem('sluxe_user');
+        if(savedUser) updateUserDisplay(savedUser);
+
+    </script>
+</body>
+</html>
